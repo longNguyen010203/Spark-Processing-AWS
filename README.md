@@ -2,7 +2,7 @@
 In this project, I set up and build a big data processing pipeline using Apache Spark integrated with various AWS services, including S3, EMR, EC2, VPC, IAM, and Redshift.
 
 ## 🔦 About Project
-<img src="./images/data_flow_aws_latest2.png">
+<img src="./images/data_flow_aws_latest3.png">
 
 ## 📦 Technologies
  - `S3`
@@ -12,4 +12,5 @@ In this project, I set up and build a big data processing pipeline using Apache 
  - `Redshift`
  - `VPC`
  - `IAM`
+ - `Terraform`
 
