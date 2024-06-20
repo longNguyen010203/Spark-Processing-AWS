@@ -1,2 +1,5 @@
 .env
 key/
+
+.terraform/
+terraform.tfstate.*
