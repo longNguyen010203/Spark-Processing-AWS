@@ -1,4 +1,10 @@
 init:
+	docker-compose up airflow-init
+
+up:
+	docker-compose up -d
+
+terra_init:
 	terraform init
 
 validate:
