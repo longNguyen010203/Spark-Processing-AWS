@@ -3,3 +3,9 @@ key/
 
 .terraform/
 terraform.tfstate.*
+
+logs/
+.aws_venv/
+data/
+
+__pycache__/

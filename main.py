@@ -42,8 +42,8 @@ def transform_data(data_source: str, output_uri: str) -> None:
         
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_source')
-    parser.add_argument('--output_uri')
+    parser.add_argument("--data_source")
+    parser.add_argument("--output_uri")
     args = parser.parse_args()
     
     transform_data(args.data_source, args.output_uri)
