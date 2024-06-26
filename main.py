@@ -8,6 +8,7 @@ from pyspark.sql.types import FloatType
 
 
 def transform_data(data_source: str, output_uri: str) -> None:
+    
     appName = "spark-101-{}".format(datetime.today())
     with SparkSession.builder.appName(appName).getOrCreate() as spark:
         # Load CSV file

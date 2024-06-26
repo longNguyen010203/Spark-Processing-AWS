@@ -4,17 +4,14 @@ init:
 up:
 	docker-compose up -d
 
-terra_init:
-	terraform init
+down:
+	docker-compose down
 
-validate:
-	terraform validate
+build:
+	docker-compose build
 
-plan:
-	terraform plan
+restart:
+	make down && make up
 
-apply:
-	terraform apply
-
-re-init:
-	terraform init --configure
+down-v:
+	docker-compose down -v
