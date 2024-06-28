@@ -8,9 +8,9 @@ In this project, I set up and build a big data processing pipeline using Apache 
  - `S3`
  - `EMR`
  - `EC2`
+ - `Airflow`
+ - `Redshift`
+ - `Terraform`
+ - `Spark`
  - `VPC`
  - `IAM`
- - `Redshift`
- - `Apache Spark`
- - `Apache Airflow`
- - `Terraform`
