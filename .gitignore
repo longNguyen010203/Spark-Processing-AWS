@@ -9,3 +9,6 @@ logs/
 data/
 
 __pycache__/
+terraform.tfstate
+
+.terraform.lock.hcl/    
