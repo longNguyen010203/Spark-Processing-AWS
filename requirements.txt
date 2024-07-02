@@ -2,3 +2,4 @@ pandas==2.2.2
 apache-airflow==2.9.2
 apache-airflow-providers-postgres==5.11.2
 apache-airflow-providers-amazon==8.25.0
+apache-airflow[amazon]
