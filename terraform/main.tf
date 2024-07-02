@@ -1,49 +1,65 @@
 #-----------#
 # Amazon S3 #
 #-----------#
-resource "aws_s3_bucket" "example" {
-  bucket = "my-tf-test-bucket"
-
+resource "aws_s3_bucket" "aws-s3" {
+  bucket = "spark-tf-processing-s3"
+  
   tags = {
-    Name        = "My bucket"
+    Name        = "S3 bucket"
     Environment = "Dev"
   }
 }
 
+resource "aws_s3_bucket_versioning" "aws-s3-versioning" {
+  bucket = aws_s3_bucket.aws-s3.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_kms_key" "kms-key" {
+  description             = "This key is used to encrypt bucket objects"
+  deletion_window_in_days = 10
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
+  bucket = aws_s3_bucket.aws-s3.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.kms-key.arn
+      sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
+
 #------------#
 # Amazon VPC #
 #------------#
-resource "aws_vpc" "example" {
-  cidr_block       = "172.16.0.0/16"
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name             = "spark-tf-processing-vpc"
+  cidr             = "10.0.0.0/16"
   instance_tenancy = "default"
 
+  azs             = ["ap-southeast-2a", "ap-southeast-2b"]
+  private_subnets = ["10.0.128.0/20", "10.0.144.0/20"]
+  public_subnets  = ["10.0.0.0/20", "10.0.16.0/20"]
+
+  enable_nat_gateway = false
+  enable_dns_hostnames = true
+
   tags = {
-    Name = "tf-example"
+    Terraform   = "true"
+    Environment = "dev"
   }
 }
 
-resource "aws_subnet" "example" {
-  vpc_id            = aws_vpc.example.id
-  cidr_block        = "172.16.10.0/24"
-  availability_zone = "us-east-2a"
+# Retrieve the AZ where we want to create network resources
+# This must be in the region selected on the AWS provider.
 
-  tags = {
-    Name = "tf-example"
-  }
-}
-
-#-----------------#
-# Amazon Redshift #
-#-----------------#
-resource "aws_redshift_cluster" "example" {
-  cluster_identifier = "tf-redshift-cluster"
-  database_name      = "mydb"
-  master_username    = "exampleuser"
-  node_type          = "dc1.large"
-  cluster_type       = "single-node"
-
-  manage_master_password = true
-}
 
 #------------#
 # Amazon EC2 #
@@ -87,12 +103,13 @@ resource "aws_instance" "example" {
   }
 }
 
+
 #------------#
 # Amazon EMR #
 #------------#
 resource "aws_emr_cluster" "cluster" {
-  name          = "emr-test-arn"
-  release_label = "emr-4.6.0"
+  name          = "spark-tf-processing-emr"
+  release_label = "emr-7.1.0"
   applications  = ["Spark"]
 
   additional_info = <<EOF
@@ -208,4 +225,18 @@ EOF
 EOF
 
   service_role = aws_iam_role.iam_emr_service_role.arn
+}
+
+
+#-----------------#
+# Amazon Redshift #
+#-----------------#
+resource "aws_redshift_cluster" "example" {
+  cluster_identifier = "tf-redshift-cluster"
+  database_name      = "mydb"
+  master_username    = "exampleuser"
+  node_type          = "dc1.large"
+  cluster_type       = "single-node"
+
+  manage_master_password = true
 }
