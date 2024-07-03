@@ -1,4 +1,5 @@
 pandas==2.2.2
+pyspark==3.5.1
 apache-airflow==2.9.2
 apache-airflow-providers-postgres==5.11.2
 apache-airflow-providers-amazon==8.25.0
