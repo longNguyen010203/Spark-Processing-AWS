@@ -3,7 +3,7 @@
 #-----------#
 resource "aws_s3_bucket" "aws-s3" {
   bucket = "spark-tf-processing-s3"
-  
+
   tags = {
     Name        = "S3 bucket"
     Environment = "Dev"
@@ -22,7 +22,7 @@ resource "aws_kms_key" "kms-key" {
   deletion_window_in_days = 10
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
+resource "aws_s3_bucket_server_side_encryption_configuration" "aws-s3-encryption" {
   bucket = aws_s3_bucket.aws-s3.id
 
   rule {
@@ -30,6 +30,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "example" {
       kms_master_key_id = aws_kms_key.kms-key.arn
       sse_algorithm     = "aws:kms"
     }
+    bucket_key_enabled = true
   }
 }
 
@@ -48,12 +49,22 @@ module "vpc" {
   private_subnets = ["10.0.128.0/20", "10.0.144.0/20"]
   public_subnets  = ["10.0.0.0/20", "10.0.16.0/20"]
 
-  enable_nat_gateway = false
+  enable_nat_gateway   = false
   enable_dns_hostnames = true
 
   tags = {
     Terraform   = "true"
     Environment = "dev"
+  }
+}
+
+resource "aws_vpc_endpoint" "s3-gateway" {
+  vpc_id       = module.vpc.vpc_id
+  service_name = "com.amazonaws.ap-southeast-2.s3"
+
+  tags = {
+    Environment = "test"
+    Name        = "spark-tf-processing-vpce-s3"
   }
 }
 
