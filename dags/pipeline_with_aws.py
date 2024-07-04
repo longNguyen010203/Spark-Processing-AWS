@@ -9,20 +9,19 @@ from airflow.decorators import task
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.providers.amazon.aws.operators.s3 import (
-    S3ListOperator, 
-    S3CopyObjectOperator,
-    S3CreateBucketOperator
-)
-from airflow.providers.amazon.aws.transfers.local_to_s3 import (
-    LocalFilesystemToS3Operator
-)
-from airflow.providers.amazon.aws.operators.emr import (
-    EmrAddStepsOperator,
-    EmrCreateJobFlowOperator,
-    EmrTerminateJobFlowOperator,
-)
+
+from airflow.providers.amazon.aws.operators.s3 import S3CreateBucketOperator
+from airflow.providers.amazon.aws.operators.s3 import S3ListOperator
+from airflow.providers.amazon.aws.operators.s3 import S3CopyObjectOperator
+from airflow.providers.amazon.aws.transfers.local_to_s3 import LocalFilesystemToS3Operator
+from airflow.providers.amazon.aws.operators.emr import EmrAddStepsOperator
+from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
+from airflow.providers.amazon.aws.operators.emr import EmrTerminateJobFlowOperator
 from airflow.providers.amazon.aws.sensors.emr import EmrJobFlowSensor
+from airflow.providers.amazon.aws.sensors.emr import EmrStepSensor
+from airflow.providers.amazon.aws.operators.redshift_cluster import (
+    RedshiftCreateClusterOperator
+)
 
 
 @task
@@ -87,9 +86,10 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v04",
     # Load csv file from local machine to s3 bucket
     csv_local_to_s3 = LocalFilesystemToS3Operator(
         task_id="csv_local_to_s3",
-        aws_conn_id="s3_bucket_connection",
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
         filename=configura_const.TEMP_FILE_PATH,
         dest_key=configura_const.S3_KEY,
+        encrypt=True,
         replace=True,
     )
     
@@ -119,14 +119,113 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v04",
             ) }}""",
     )
     
-    # Add steps to the emr cluster
+    
     add_steps_extraction = EmrAddStepsOperator(
         task_id="add_steps_extraction",
-        job_flow_id='',
-        steps=configura_const.SPARK_STEPS_EXTRACTION
+        steps=configura_const.SPARK_STEPS_EXTRACTION,
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+        job_flow_id="""{{
+            task_instance.xcom_pull(
+                task_ids='create_spark_emr_cluster', 
+                key='return_value'
+            ) }}""",
+    )
+    
+    is_extraction_completed = EmrStepSensor(
+        task_id="is_extraction_completed",
+        timeout=timedelta(seconds=3600),
+        poke_interval=timedelta(seconds=5),
+        target_states={"COMPLETED"},
+        step_id="""{{ 
+            task_instance.xcom_pull(
+                task_ids='add_steps_extraction')[0] 
+            }}""",
+        job_flow_id="""{{
+            task_instance.xcom_pull(
+                task_ids='create_spark_emr_cluster', 
+                key='return_value'
+            ) }}""",
+    )
+    
+    transformation_file_to_s3 = LocalFilesystemToS3Operator(
+        task_id="transformation_file_to_s3",
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+        filename=configura_const.TRANSFORM_FILE_NAME,
+        dest_key=configura_const.TRANSFORM_FILE_URI,
+        replace=True,
+    )
+    
+    add_transformation_step = EmrAddStepsOperator(
+        task_id="add_transformation_step",
+        steps=configura_const.SPARK_STEPS_TRANSFORMATION,
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+        job_flow_id="""{{
+            task_instance.xcom_pull(
+                task_ids='create_spark_emr_cluster', 
+                key='return_value'
+            ) }}""",
+    )
+    
+    is_transformation_completed = EmrStepSensor(
+        task_id="is_transformation_completed",
+        timeout=timedelta(seconds=3600),
+        poke_interval=timedelta(seconds=10),
+        target_states={"COMPLETED"},
+        step_id="""{{ 
+            task_instance.xcom_pull(
+                task_ids='add_transformation_step')[0] 
+            }}""",
+        job_flow_id="""{{
+            task_instance.xcom_pull(
+                task_ids='create_spark_emr_cluster', 
+                key='return_value'
+            ) }}""",
+    )
+    
+    terminate_spark_emr_cluster = EmrTerminateJobFlowOperator(
+        task_id="terminate_spaairflowrk_emr_cluster",
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+        job_flow_id="""{{
+            task_instance.xcom_pull(
+                task_ids='create_spark_emr_cluster', 
+                key='return_value'
+            ) }}""",
+    )
+    
+    is_emr_cluster_terminated = EmrJobFlowSensor(
+        task_id="is_emr_cluster_terminated",
+        target_states={"TERMINATED"},
+        timeout=timedelta(seconds=3600),
+        poke_interval=timedelta(seconds=5),
+        mode="poke",
+        job_flow_id="""{{
+            task_instance.xcom_pull(
+                task_ids='create_spark_emr_cluster', 
+                key='return_value'
+            ) }}""",
+    )
+    
+    create_aws_redshift_cluster = RedshiftCreateClusterOperator(
+        task_id="create_aws_redshift_cluster",
+        cluster_identifier=configura_const.REDSHIFT_CLUSTER_IDENTIFIER,
+        publicly_accessible=False,
+        cluster_type="single-node",
+        node_type="dc2.large",
+        number_of_nodes=1,
+        encrypted=True,
+        master_username=os.getenv("REDSHIFT_DB_LOGIN"),
+        master_user_password=os.getenv("REDSHIFT_DB_PASS"),
+        db_name=os.getenv("REDSHIFT_DB_NAME")
     )
     
     
-    start_processing_pipeline >> [create_aws_s3_bucket, create_spark_emr_cluster]
-    create_spark_emr_cluster >> [is_emr_cluster_created, add_steps_extraction]
-    create_aws_s3_bucket >> csv_local_to_s3
+    start_processing_pipeline >> create_aws_s3_bucket
+    start_processing_pipeline >> create_spark_emr_cluster
+    create_spark_emr_cluster >> is_emr_cluster_created
+    create_aws_s3_bucket >> csv_local_to_s3 >> add_steps_extraction
+    is_emr_cluster_created >> add_steps_extraction >> is_extraction_completed
+    is_extraction_completed >> add_transformation_step >> is_transformation_completed
+    create_aws_s3_bucket >> transformation_file_to_s3 >> add_transformation_step
+    is_transformation_completed >> terminate_spark_emr_cluster
+    terminate_spark_emr_cluster >> is_emr_cluster_terminated
+    start_processing_pipeline >> create_aws_redshift_cluster
