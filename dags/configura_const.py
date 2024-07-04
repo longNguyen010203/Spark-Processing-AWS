@@ -7,16 +7,21 @@ S3_FOLDER_LOG = "logs"
 S3_FOLDER_INPUT = "input"
 S3_FOLDER_OUTPUT = "output"
 S3_FOLDER_SCRIPT = "scripts"
+S3_REGION_NAME = "ap-southeast-2"
 S3_BUCKET_NAME = "spark-tf-processing-s3"
 S3_FILENAME = "Orders.csv"
+TRANSFORM_FILE_NAME = ""
 TEMP_FILE_PATH = "/opt/airflow/data/Orders.csv"
 
+TRANSFORM_FILE_URI = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_SCRIPT}/{TRANSFORM_FILE_NAME}"
 LOG_URI = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_LOG}/"
 S3_KEY = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_INPUT}/{S3_FILENAME}"
 FILE_PATH = Path(__file__).joinpath("..", "..", "data", "Orders.csv").resolve()
 
 EC2_SUBNET_ID = ""
 EC2_KEY_NAME = ""
+
+REDSHIFT_CLUSTER_IDENTIFIER = ""
 
 SECURITY_CONFIGURATION: dict[str, dict] = {
     "AuthorizationConfiguration": {
@@ -35,8 +40,22 @@ SPARK_STEPS_EXTRACTION: list[dict[str, Any]] = [
         "Name": "Extract Orders Data",
         "ActionOnFailure": "CANCEL_AND_WAIT",
         "HadoopJarStep": {
-            "Jar": "s3://ap-southeast-2.elasticmapreduce/libs/script-runner/script-runner.jar",
+            "Jar": f"s3://{S3_REGION_NAME}.elasticmapreduce/libs/script-runner/script-runner.jar",
             "Args": [f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_SCRIPT}/ingest.sh"],
+        },
+    }
+]
+
+SPARK_STEPS_TRANSFORMATION: list[dict[str, Any]] = [
+    {
+        "Name": "Transform Orders Data",
+        "ActionOnFailure": "CANCEL_AND_WAIT",
+        "HadoopJarStep": {
+            "Jar": "command-runner.jar",
+            "Args": [
+                "spark-submit",
+                f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_SCRIPT}/{TRANSFORM_FILE_NAME}"
+            ],
         },
     }
 ]
