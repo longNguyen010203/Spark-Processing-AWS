@@ -10,6 +10,7 @@ S3_FOLDER_SCRIPT = "scripts"
 S3_REGION_NAME = "ap-southeast-2"
 S3_BUCKET_NAME = "spark-tf-processing-s3"
 S3_FILENAME = "Orders.csv"
+S3_BUCKET_DELIMITER = "/"
 TRANSFORM_FILE_NAME = ""
 TEMP_FILE_PATH = "/opt/airflow/data/Orders.csv"
 
@@ -18,10 +19,14 @@ LOG_URI = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_LOG}/"
 S3_KEY = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_INPUT}/{S3_FILENAME}"
 FILE_PATH = Path(__file__).joinpath("..", "..", "data", "Orders.csv").resolve()
 
+AWS_CONN_ID = "s3_bucket_connection"
+REDSHIFT_CONN_ID = ""
+
 EC2_SUBNET_ID = ""
 EC2_KEY_NAME = ""
-
 REDSHIFT_CLUSTER_IDENTIFIER = ""
+REDSHIFT_SCHEMA = "PUBLIC"
+REDSHIFT_TABLE = ""
 
 SECURITY_CONFIGURATION: dict[str, dict] = {
     "AuthorizationConfiguration": {
