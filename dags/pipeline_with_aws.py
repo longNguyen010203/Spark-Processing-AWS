@@ -19,9 +19,9 @@ from airflow.providers.amazon.aws.operators.emr import EmrCreateJobFlowOperator
 from airflow.providers.amazon.aws.operators.emr import EmrTerminateJobFlowOperator
 from airflow.providers.amazon.aws.sensors.emr import EmrJobFlowSensor
 from airflow.providers.amazon.aws.sensors.emr import EmrStepSensor
-from airflow.providers.amazon.aws.operators.redshift_cluster import (
-    RedshiftCreateClusterOperator
-)
+from airflow.providers.amazon.aws.operators.redshift_cluster import RedshiftCreateClusterOperator
+from airflow.providers.amazon.aws.sensors.redshift_cluster import RedshiftClusterSensor
+from airflow.providers.amazon.aws.transfers.s3_to_redshift import S3ToRedshiftOperator
 
 
 @task
@@ -218,6 +218,51 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v04",
         db_name=os.getenv("REDSHIFT_DB_NAME")
     )
     
+    wait_cluster_available = RedshiftClusterSensor(
+        task_id="wait_cluster_available",
+        cluster_identifier=configura_const.REDSHIFT_CLUSTER_IDENTIFIER,
+        target_status="available",
+        poke_interval=timedelta(seconds=5),
+        timeout=timedelta(seconds=60 * 30),
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+        mode="poke"
+    )
+    
+    list_files_in_s3 = S3ListOperator(
+        task_id="list_files_in_s3",
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+        bucket=configura_const.S3_BUCKET_NAME,
+        prefix=configura_const.S3_FOLDER_OUTPUT,
+        delimiter=configura_const.S3_BUCKET_DELIMITER
+    )
+    
+    copy_files_from_s3 = S3CopyObjectOperator.partial(
+        task_id="copy_files_from_s3",
+        aws_conn_id=os.getenv("AWS_CONN_ID"),
+    ).expand_kwargs(
+        list_files_in_s3.output.map(
+            lambda x: {
+                "source_bucket_key": "",
+                "dest_bucket_key": ""
+            }
+        )
+    )
+    
+    transfer_s3_to_redshift = S3ToRedshiftOperator(
+        task_id="transfer_s3_to_redshift",
+        redshift_conn_id=configura_const.REDSHIFT_CONN_ID,
+        s3_bucket=configura_const.S3_BUCKET_NAME,
+        s3_key=configura_const.S3_KEY,
+        schema=configura_const.REDSHIFT_SCHEMA,
+        table=configura_const.REDSHIFT_TABLE,
+        copy_options=["parquet"],
+    )
+    
+    end_processing_pipeline = BashOperator(
+        task_id="end_processing_pipeline",
+        bash_command="echo End Data Pipeline"
+    )
+    
     
     start_processing_pipeline >> create_aws_s3_bucket
     start_processing_pipeline >> create_spark_emr_cluster
@@ -225,7 +270,11 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v04",
     create_aws_s3_bucket >> csv_local_to_s3 >> add_steps_extraction
     is_emr_cluster_created >> add_steps_extraction >> is_extraction_completed
     is_extraction_completed >> add_transformation_step >> is_transformation_completed
+    is_transformation_completed >> [list_files_in_s3, transfer_s3_to_redshift]
     create_aws_s3_bucket >> transformation_file_to_s3 >> add_transformation_step
     is_transformation_completed >> terminate_spark_emr_cluster
     terminate_spark_emr_cluster >> is_emr_cluster_terminated
-    start_processing_pipeline >> create_aws_redshift_cluster
+    is_emr_cluster_terminated >> end_processing_pipeline
+    start_processing_pipeline >> create_aws_redshift_cluster >> wait_cluster_available
+    wait_cluster_available >> transfer_s3_to_redshift
+    transfer_s3_to_redshift >> end_processing_pipeline
