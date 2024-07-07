@@ -1,13 +1,13 @@
 import argparse
 from datetime import datetime
 
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col
 from pyspark.sql.types import FloatType
 
 
 
-def transform_data(data_source: str, output_uri: str) -> None:
+def transform_book_reviews(data_source: str, output_uri: str) -> None:
     
     appName = "spark-101-{}".format(datetime.today())
     with SparkSession.builder.appName(appName).getOrCreate() as spark:
@@ -32,7 +32,7 @@ def transform_data(data_source: str, output_uri: str) -> None:
         """
         
         # Transform Data
-        transformed_df = spark.sql(GROUP_BY_QUERY)
+        transformed_df: DataFrame = spark.sql(GROUP_BY_QUERY)
         
         # Log into EMR stdout
         print(f"Number of rows in SQL query: {transformed_df.count()}")
@@ -47,4 +47,4 @@ if __name__ == "__main__":
     parser.add_argument("--output_uri")
     args = parser.parse_args()
     
-    transform_data(args.data_source, args.output_uri)
+    transform_book_reviews(args.data_source, args.output_uri)
