@@ -4,6 +4,9 @@ In this project, I set up and build a big data processing pipeline using Apache 
 ## 🔦 About Project
 <img src="./images/AWS_DataFlow.png">
 
+### 1. Pipeline
+<img src="./images/pipeline_v2.png">
+
 ## 📦 Technologies
  - `S3`
  - `EMR`
