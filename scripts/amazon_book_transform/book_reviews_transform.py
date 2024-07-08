@@ -22,6 +22,9 @@ def transform_book_reviews(data_source: str, output_uri: str) -> None:
                .option("escape", "\"") \
                .option("delimiter", ",") \
                .csv(data_source)
+               
+        # Log into EMR stdout
+        print(f"Number of rows and columns: {df.count()}, {len(df.columns)}")
         
         # Rename columns
         df = df.select(
@@ -40,10 +43,12 @@ def transform_book_reviews(data_source: str, output_uri: str) -> None:
         # Drop Null value in title column
         df = df.dropna(subset=["title"])
         
+        
         # Fill in avg price for missing values in price columns
         avg_price = df.select(avg(col("price"))).first()[0]
         df = df.fillna({"price": avg_price})
         df = df.withColumn("price", round(col("price"), 2))
+        
         
         # Fill in unknown for missing values in columns
         df = df.fillna({"user_id": "unknown"}) \
@@ -78,11 +83,14 @@ def transform_book_reviews(data_source: str, output_uri: str) -> None:
                     .when(col("month") == 11, "November")
                     .when(col("month") == 12, "December")
                     .otherwise("Unknown")
-                    )
+        )
         
         # Drop NA
         df = df.dropna(subset=["review_summary"])
         df = df.dropna(subset=["review_text"])
+        
+        # Log into EMR stdout
+        print(f"Number of rows and columns: {df.count()}, {len(df.columns)}")
         
         # Write our results as parquet files
         df.write.mode("overwrite").parquet(output_uri)
