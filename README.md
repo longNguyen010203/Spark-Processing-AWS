@@ -15,6 +15,8 @@ In this project, I set up and build a big data processing pipeline using Apache 
  - `VPC`
  - `IAM`
 
+## 🦄 Features
+## 👩🏽‍🍳 The Process
 ## 📚 What I Learned
 ## 💭 How can it be improved?
 ## 🚦 Running the Project
