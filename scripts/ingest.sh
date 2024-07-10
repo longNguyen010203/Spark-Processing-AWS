@@ -1,2 +1,2 @@
-wget -O - https://redfin-public-data.s3.us-west-2.amazonaws.com/redfin_market_tracker/city_market_tracker.tsv000.gz | 
-aws s3 cp - s3://redfin-data-project-yml/store-raw-data-yml/city_market_tracker.tsv000.gz
+wget -O - https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2024-01.parquet | 
+aws s3 cp - s3://nyc-yellow-tripdata/2024-01/data/raw/yellow_tripdata_2024-01.parquet
