@@ -30,7 +30,7 @@ def get_dag_id(dag_id: str) -> str:
     print(f"start processing pipeline with DAG ID: {dag_id}")
 
 
-with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
+with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
          default_args={
              'owner': 'longdata',
              'retries': 3,
@@ -48,7 +48,8 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
             """,
          start_date=datetime(2024, 6, 26),
          schedule_interval='0 0 * * *',
-         catchup=False) as dag:
+         catchup=False
+) as dag:
     
     
     # Init pipeline on airflow
@@ -65,7 +66,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
         task_id="create_aws_s3_bucket",
         bucket_name=configura_const.S3_BUCKET_NAME,
         aws_conn_id=configura_const.AWS_CONN_ID,
-        region_name="ap-southeast-2"
+        region_name="eu-west-1"
     )
 
     # Load shell file from local machine to s3 bucket
@@ -95,7 +96,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
         aws_conn_id=configura_const.AWS_CONN_ID,
         # emr_conn_id=os.getenv("AWS_EMR_CONN_ID"),
         job_flow_overrides=configura_const.JOB_FLOW_OVERRIDES,
-        region_name="ap-southeast-2"
+        region_name="eu-west-1"
     )
     
     # Check if emr cluster has been created
@@ -106,11 +107,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
         poke_interval=timedelta(seconds=5),
         timeout=timedelta(seconds=3600),
         mode="poke",
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        job_flow_id="""{{ task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}""",
     )
     
     # step extraction in emr cluster
@@ -142,40 +139,20 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
             ) }}""",
     )
     
-    # Load transformation review data file to s3 bucket
-    transformation_review_file_to_s3 = LocalFilesystemToS3Operator(
-        task_id="transformation_review_file_to_s3",
+    # Load transformation file to s3 bucket
+    transformation_file_to_s3 = LocalFilesystemToS3Operator(
+        task_id="transformation_file_to_s3",
         aws_conn_id=configura_const.AWS_CONN_ID,
-        filename=configura_const.TRANSFORM_BOOK_REVIEW_PATH,
-        dest_key=configura_const.TRANSFORM_RIVIEW_URI,
+        filename=configura_const.TRANSFORM_FILE_PATH,
+        dest_key=configura_const.TRANSFORM_FILE_URI,
         replace=True,
     )
-    
-    # Load transformation detail data file to s3 bucket
-    transformation_detail_file_to_s3 = LocalFilesystemToS3Operator(
-        task_id="transformation_detail_file_to_s3",
-        aws_conn_id=configura_const.AWS_CONN_ID,
-        filename=configura_const.TRANSFORM_BOOK_DETAIL_PATH,
-        dest_key=configura_const.TRANSFORM_DETAIL_URI,
-        replace=True,
-    )
-    
-    # implement transform review data using emr cluster
-    transformation_review_step = EmrAddStepsOperator(
-        task_id="transformation_review_step",
-        steps=configura_const.SPARK_TRANSFORMATION_REVIEW,
-        aws_conn_id=configura_const.AWS_CONN_ID,
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
-    )
+
     
     # implement transform data using emr cluster
-    transformation_detail_step = EmrAddStepsOperator(
-        task_id="transformation_detail_step",
-        steps=configura_const.SPARK_TRANSFORMATION_DETAIL,
+    transformation_tripdata_step = EmrAddStepsOperator(
+        task_id="transformation_tripdata_step",
+        steps=configura_const.SPARK_TRANSFORMATION,
         aws_conn_id=configura_const.AWS_CONN_ID,
         job_flow_id="""{{
             task_instance.xcom_pull(
@@ -183,15 +160,16 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
                 key='return_value'
             ) }}""",
     )
+
     
-    is_transformation_review_completed = EmrStepSensor(
-        task_id="is_transformation_review_completed",
+    is_transformation_completed = EmrStepSensor(
+        task_id="is_transformation_completed",
         timeout=timedelta(seconds=3600),
         poke_interval=timedelta(seconds=10),
         target_states={"COMPLETED"},
         step_id="""{{ 
             task_instance.xcom_pull(
-                task_ids='transformation_review_step')[0] 
+                task_ids='transformation_tripdata_step')[0] 
             }}""",
         job_flow_id="""{{
             task_instance.xcom_pull(
@@ -200,21 +178,6 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
             ) }}""",
     )
     
-    is_transformation_detail_completed = EmrStepSensor(
-        task_id="is_transformation_detail_completed",
-        timeout=timedelta(seconds=3600),
-        poke_interval=timedelta(seconds=10),
-        target_states={"COMPLETED"},
-        step_id="""{{ 
-            task_instance.xcom_pull(
-                task_ids='transformation_detail_step')[0] 
-            }}""",
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
-    )
     
     terminate_spark_emr_cluster = EmrTerminateJobFlowOperator(
         task_id="terminate_spark_emr_cluster",
@@ -265,8 +228,8 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
     Computation_file_to_s3 = LocalFilesystemToS3Operator(
         task_id="Computation_file_to_s3",
         aws_conn_id=configura_const.AWS_CONN_ID,
-        filename=configura_const.COMPUTE_BOOKS_PATH,
-        dest_key=configura_const.COMPUTE_BOOKS_URI,
+        filename=configura_const.COMPUTE_FILE_PATH,
+        dest_key=configura_const.COMPUTE_FILE_URI,
         replace=True,
     )
     
@@ -301,7 +264,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
         task_id="transfer_s3_to_redshift",
         redshift_conn_id=configura_const.REDSHIFT_CONN_ID,
         s3_bucket=configura_const.S3_BUCKET_NAME,
-        s3_key=configura_const.COMPUTE_BOOKS_URI,
+        s3_key=configura_const.COMPUTE_DATA_OUTPUT,
         schema=configura_const.REDSHIFT_SCHEMA,
         table=configura_const.REDSHIFT_TABLE,
         copy_options=["parquet"],
@@ -320,16 +283,12 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v21",
     create_aws_s3_bucket >> create_object_in_s3
     create_object_in_s3 >> create_spark_emr_cluster
     is_emr_cluster_created >> add_steps_extraction >> is_extraction_completed
-    is_extraction_completed >> transformation_review_step
-    is_extraction_completed >> transformation_detail_step
+    is_extraction_completed >> transformation_tripdata_step
     shell_local_to_s3 >> add_steps_extraction >> is_extraction_completed
-    create_aws_s3_bucket >> transformation_review_file_to_s3
-    create_aws_s3_bucket >> transformation_detail_file_to_s3
-    transformation_review_file_to_s3 >> transformation_review_step >> is_transformation_review_completed
-    transformation_detail_file_to_s3 >> transformation_detail_step >> is_transformation_detail_completed
+    create_aws_s3_bucket >> transformation_file_to_s3
+    transformation_file_to_s3 >> transformation_tripdata_step >> is_transformation_completed
     create_aws_s3_bucket >> Computation_file_to_s3 >> add_Computation_step
-    is_transformation_review_completed >> add_Computation_step
-    is_transformation_detail_completed >> add_Computation_step
+    is_transformation_completed >> add_Computation_step
     add_Computation_step >> is_Computation_completed
     is_Computation_completed >> terminate_spark_emr_cluster >> is_emr_cluster_terminated
     is_emr_cluster_terminated >> end_processing_pipeline
