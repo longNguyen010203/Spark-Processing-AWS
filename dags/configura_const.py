@@ -4,7 +4,7 @@ from typing import Any
 
 AWS_CONN_ID = "aws_conn"
 
-S3_BUCKET_NAME = "yellow-tripdata-nyc"
+S3_BUCKET_NAME = "taxi-yellow-tripdata"
 S3_FOLDER_ROOT = "2024-01"
 S3_FOLDER_LOG = "logs"
 S3_FOLDER_SCRIPT = "scripts"
@@ -25,7 +25,7 @@ TRANSFORM_FILE_URI = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_ROOT}/{S3_FOLDER_SCRIPT}
 
 
 DATA_FILE_NAME = "yellow_tripdata_2024-01.parquet"
-BOOK_REVIEW_SOURCE = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_ROOT}/{S3_FOLDER_DATA}/raw/{DATA_FILE_NAME}"
+TAXI_TRIPDATA_SOURCE = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_ROOT}/{S3_FOLDER_DATA}/raw/{DATA_FILE_NAME}"
 TRANSFORM_DATA_OUTPUT = f"s3://{S3_BUCKET_NAME}/{S3_FOLDER_ROOT}/{S3_FOLDER_DATA}/transform/{DATA_FILE_NAME}"
 
 
@@ -49,7 +49,7 @@ FILE_PATH = Path(__file__).joinpath("..", "..", "data", "Orders.csv").resolve()
 
 REDSHIFT_CONN_ID = ""
 
-REDSHIFT_CLUSTER_IDENTIFIER = ""
+REDSHIFT_CLUSTER_IDENTIFIER = "redshift_cluster_identifier"
 REDSHIFT_SCHEMA = "PUBLIC"
 REDSHIFT_TABLE = ""
 
@@ -77,12 +77,12 @@ JOB_FLOW_OVERRIDES: dict[str, Any] = {
                 "Market": "ON_DEMAND",
                 "InstanceRole": "CORE",
                 "InstanceType": "m5.xlarge",
-                "InstanceCount": 3,
+                "InstanceCount": 2,
             }
         ],
         
-        "Ec2SubnetId": "subnet-03327f94e28f3f1e3",
-        "Ec2KeyName": "nyc-tripdata-emr-key",
+        "Ec2SubnetId": "subnet-04c1bd9b114f53e86",
+        "Ec2KeyName": "nyc-yellow-trip-pair",
         "KeepJobFlowAliveWhenNoSteps": True,
         "TerminationProtected": False,
     },
