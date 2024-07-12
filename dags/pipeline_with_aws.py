@@ -1,6 +1,7 @@
 import os
 import json
 import boto3
+from botocore.config import Config
 import configura_const
 from datetime import datetime, timedelta
 
@@ -30,7 +31,7 @@ def get_dag_id(dag_id: str) -> str:
     print(f"start processing pipeline with DAG ID: {dag_id}")
 
 
-with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
+with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v37",
          default_args={
              'owner': 'longdata',
              'retries': 3,
@@ -107,7 +108,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         poke_interval=timedelta(seconds=5),
         timeout=timedelta(seconds=3600),
         mode="poke",
-        job_flow_id="""{{ task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}""",
+        job_flow_id="{{ task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     # step extraction in emr cluster
@@ -115,11 +116,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         task_id="add_steps_extraction",
         steps=configura_const.SPARK_STEPS_EXTRACTION,
         aws_conn_id=configura_const.AWS_CONN_ID,
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     # Check if emr cluster extract completed
@@ -128,15 +125,8 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         timeout=timedelta(seconds=3600),
         poke_interval=timedelta(seconds=5),
         target_states={"COMPLETED"},
-        step_id="""{{ 
-            task_instance.xcom_pull(
-                task_ids='add_steps_extraction')[0] 
-            }}""",
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        step_id="{{ task_instance.xcom_pull(task_ids='add_steps_extraction')[0] }}",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     # Load transformation file to s3 bucket
@@ -154,11 +144,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         task_id="transformation_tripdata_step",
         steps=configura_const.SPARK_TRANSFORMATION,
         aws_conn_id=configura_const.AWS_CONN_ID,
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
 
     
@@ -167,26 +153,15 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         timeout=timedelta(seconds=3600),
         poke_interval=timedelta(seconds=10),
         target_states={"COMPLETED"},
-        step_id="""{{ 
-            task_instance.xcom_pull(
-                task_ids='transformation_tripdata_step')[0] 
-            }}""",
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        step_id="{{ task_instance.xcom_pull(task_ids='transformation_tripdata_step')[0] }}",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     
     terminate_spark_emr_cluster = EmrTerminateJobFlowOperator(
         task_id="terminate_spark_emr_cluster",
         aws_conn_id=configura_const.AWS_CONN_ID,
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     is_emr_cluster_terminated = EmrJobFlowSensor(
@@ -195,11 +170,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         timeout=timedelta(seconds=3600),
         poke_interval=timedelta(seconds=5),
         mode="poke",
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     create_aws_redshift_cluster = RedshiftCreateClusterOperator(
@@ -237,11 +208,7 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         task_id="add_Computation_step",
         steps=configura_const.SPARK_STEPS_COMPUTATION,
         aws_conn_id=configura_const.AWS_CONN_ID,
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     is_Computation_completed = EmrStepSensor(
@@ -249,15 +216,8 @@ with DAG(dag_id="dag_processing_pipeline_with_aws_cloud_v28",
         timeout=timedelta(seconds=3600),
         poke_interval=timedelta(seconds=10),
         target_states={"COMPLETED"},
-        step_id="""{{ 
-            task_instance.xcom_pull(
-                task_ids='add_Computation_step')[0] 
-            }}""",
-        job_flow_id="""{{
-            task_instance.xcom_pull(
-                task_ids='create_spark_emr_cluster', 
-                key='return_value'
-            ) }}""",
+        step_id="{{ task_instance.xcom_pull(task_ids='add_Computation_step')[0] }}",
+        job_flow_id="{{task_instance.xcom_pull(task_ids='create_spark_emr_cluster', key='return_value') }}",
     )
     
     transfer_s3_to_redshift = S3ToRedshiftOperator(
